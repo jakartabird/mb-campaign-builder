@@ -271,7 +271,7 @@ function transformDataVideo(data, totalVar, fieldNames, wafieldNames, channelId,
 }
 
 app.post("/api/upload-text", upload.single("file"), (req, res) => {
-    if(req.body.accesskey === undefined || req.body.accesskey === null) {
+    if(req.body.accessKey === undefined || req.body.accessKey === null) {
         res.status(401).send({message: "Access key is required"});
     }
 
@@ -316,7 +316,7 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
     let languageCode = req.body.languageCode;
     let reportUrl = req.body.reportUrl ? req.body.reportUrl : "";
     let imageUrl = req.body.imageUrl;
-    let accessKey = req.body.accesskey;
+    let accessKey = req.body.accessKey;
     // let dbType = req.body.dbtype;
     // let connectionString = req.body.connectionString;
 
@@ -493,7 +493,7 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
 });
 
 app.post("/api/upload-image", upload.single("file"), (req, res) => {
-    if(req.body.accesskey === undefined || req.body.accesskey === null) {
+    if(req.body.accessKey === undefined || req.body.accessKey === null) {
         res.status(401).send({message: "Access key is required"});
     }
 
@@ -538,7 +538,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
     let languageCode = req.body.languageCode;
     let reportUrl = req.body.reportUrl ? req.body.reportUrl : "";
     let imageUrl = req.body.imageUrl;
-    let accessKey = req.body.accesskey;
+    let accessKey = req.body.accessKey;
 
     let csvData = [];
 
@@ -705,7 +705,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
 });
 
 app.post("/api/upload-video", upload.single("file"), (req, res) => {
-    if(req.body.accesskey === undefined || req.body.accesskey === null) {
+    if(req.body.accessKey === undefined || req.body.accessKey === null) {
         res.status(401).send({message: "Access key is required"});
     }
 
@@ -750,7 +750,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
     let languageCode = req.body.languageCode;
     let reportUrl = req.body.reportUrl ? req.body.reportUrl : "";
     let videoUrl = req.body.videoUrl;
-    let accessKey = req.body.accesskey;
+    let accessKey = req.body.accessKey;
 
     let csvData = [];
 
