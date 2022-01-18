@@ -272,40 +272,36 @@ function transformDataVideo(data, totalVar, fieldNames, wafieldNames, channelId,
 
 app.post("/api/upload-text", upload.single("file"), (req, res) => {
     if(req.body.accessKey === undefined || req.body.accessKey === null) {
-        res.status(401).send({message: "Access key is required"});
+        return res.status(401).send({message: "Access key is required"});
     }
 
     if(req.body.namespaceId === undefined || req.body.namespaceId === null) {
-        res.status(400).send({message: "Namespace ID is required"});
+        return res.status(400).send({message: "Namespace ID is required"});
     }
 
     if(req.body.channelId === undefined || req.body.channelId === null) {
-        res.status(400).send({message: "Channel ID is required"});
+        return res.status(400).send({message: "Channel ID is required"});
     }
 
     if(req.body.templateName === undefined || req.body.templateName === null) {
-        res.status(400).send({message: "Template Name is required"});
+        return res.status(400).send({message: "Template Name is required"});
     }
 
     if(req.body.languageCode === undefined || req.body.languageCode === null) {
-        res.status(400).send({message: "Language Code is required"});
+        return res.status(400).send({message: "Language Code is required"});
     }
 
     if(req.body.totalVariable === undefined || req.body.totalVariable === null) {
-        res.status(400).send({message: "Total Variable is required"});
+        return res.status(400).send({message: "Total Variable is required"});
     }
 
     if(req.body.fieldNames === undefined || req.body.fieldNames === null) {
-        res.status(400).send({message: "Field Names is required"});
+        return res.status(400).send({message: "Field Names is required"});
     }
 
     if(req.body.waFieldName === undefined || req.body.waFieldName === null) {
-        res.status(400).send({message: "WA Field Names is required"});
+        return res.status(400).send({message: "WA Field Names is required"});
     }
-
-    // if(req.body.imageUrl === undefined || req.body.imageUrl === null) {
-    //     res.status(400).send({message: "Image URL is required"});
-    // }
 
     let totalVariable = req.body.totalVariable ? req.body.totalVariable : 0;
     let fieldNames = (req.body.fieldNames);
@@ -315,7 +311,6 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
     let templateName = req.body.templateName;
     let languageCode = req.body.languageCode;
     let reportUrl = req.body.reportUrl ? req.body.reportUrl : "";
-    let imageUrl = req.body.imageUrl;
     let accessKey = req.body.accessKey;
     // let dbType = req.body.dbtype;
     // let connectionString = req.body.connectionString;
@@ -324,7 +319,7 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
 
     try {
         if(req.file == undefined) {
-            res.status(400).send({
+            return res.status(400).send({
                 message: "Please upload a file"
             });
         }
@@ -352,7 +347,7 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                             console.log(JSON.stringify(line));
                             axios({
                                 method: 'POST',
-                                url: 'https://conversations.messagebird.com/v1/conversations/start',
+                                url: 'https://conversations.messagebird.com/v1/send',
                                 headers: {'Authorization': 'AccessKey ' + accessKey},
                                 data: line
                             })
@@ -362,9 +357,8 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                     var data = {
                                         "id": index,
                                         "phone_number": line.to,
-                                        "conversationId": response.data.id,
-                                        "lastMessageId": response.data.messages.lastMessageId,
-                                        "status": "sent",
+                                        "messageId": response.data.id,
+                                        "status": response.data.status,
                                         "timestamp": new Date()
                                     }
                                     // _result.push(data)
@@ -379,8 +373,7 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                 var data = {
                                     "id": index,
                                     "phone_number": line.to,
-                                    "conversationId": "",
-                                    "lastMessageId": "",
+                                    "messageId": "",
                                     "status": "failed",
                                     "timestamp": new Date()
                                 }
@@ -414,19 +407,19 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                         async (line, index) => {
                                             axios({
                                                 method: 'POST',
-                                                url: 'https://conversations.messagebird.com/v1/conversations/start',
+                                                url: 'https://conversations.messagebird.com/v1/send',
                                                 headers: {'Authorization': 'AccessKey ' + accessKey},
                                                 data: line
                                             })
                                             .then(response => {
                                                 if(response.status > 200 && response.status < 300){
                                                     console.log(line)
+
                                                     var data = {
                                                         "id": index,
-                                                        "phone_number": csvData[index][waField],
-                                                        "conversationId": response.data.id,
-                                                        "lastMessageId": response.data.messages.lastMessageId,
-                                                        "status": "sent",
+                                                        "phone_number": line.to,
+                                                        "messageId": response.data.id,
+                                                        "status": response.data.status,
                                                         "timestamp": new Date()
                                                     }
                                                     // _result.push(data)
@@ -448,9 +441,8 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                                 // console.log(error)
                                                 var data = {
                                                     "id": index,
-                                                    "phone_number": csvData[index][waField],
-                                                    "conversationId": "",
-                                                    "lastMessageId": "",
+                                                    "phone_number": line.to,
+                                                    "messageId": "",
                                                     "status": "failed",
                                                     "timestamp": new Date()
                                                 }
@@ -479,13 +471,13 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                     }
                 }
 
-                res.status(200).send({
+                return res.status(200).send({
                     message: "Processing data... Please wait!"
                 });
 
             });
             } catch (error) {
-                res.status(500).send({
+                return res.status(500).send({
                     message: "Error",
                     error: error
                 });
@@ -494,39 +486,39 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
 
 app.post("/api/upload-image", upload.single("file"), (req, res) => {
     if(req.body.accessKey === undefined || req.body.accessKey === null) {
-        res.status(401).send({message: "Access key is required"});
+        return res.status(401).send({message: "Access key is required"});
     }
 
     if(req.body.namespaceId === undefined || req.body.namespaceId === null) {
-        res.status(400).send({message: "Namespace ID is required"});
+        return res.status(400).send({message: "Namespace ID is required"});
     }
 
     if(req.body.channelId === undefined || req.body.channelId === null) {
-        res.status(400).send({message: "Channel ID is required"});
+        return res.status(400).send({message: "Channel ID is required"});
     }
 
     if(req.body.templateName === undefined || req.body.templateName === null) {
-        res.status(400).send({message: "Template Name is required"});
+        return res.status(400).send({message: "Template Name is required"});
     }
 
     if(req.body.languageCode === undefined || req.body.languageCode === null) {
-        res.status(400).send({message: "Language Code is required"});
+        return res.status(400).send({message: "Language Code is required"});
     }
 
     if(req.body.totalVariable === undefined || req.body.totalVariable === null) {
-        res.status(400).send({message: "Total Variable is required"});
+        return res.status(400).send({message: "Total Variable is required"});
     }
 
     if(req.body.fieldNames === undefined || req.body.fieldNames === null) {
-        res.status(400).send({message: "Field Names is required"});
+        return res.status(400).send({message: "Field Names is required"});
     }
 
     if(req.body.waFieldName === undefined || req.body.waFieldName === null) {
-        res.status(400).send({message: "WA Field Names is required"});
+        return res.status(400).send({message: "WA Field Names is required"});
     }
 
     if(req.body.imageUrl === undefined || req.body.imageUrl === null) {
-        res.status(400).send({message: "Image URL is required"});
+        return res.status(400).send({message: "Image URL is required"});
     }
 
     let totalVariable = req.body.totalVariable ? req.body.totalVariable : 0;
@@ -544,7 +536,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
 
     try {
         if(req.file == undefined) {
-            res.status(400).send({
+            return res.status(400).send({
                 message: "Please upload a file"
             });
         }
@@ -571,7 +563,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                         async (line, index) => {
                             axios({
                                 method: 'POST',
-                                url: 'https://conversations.messagebird.com/v1/conversations/start',
+                                url: 'https://conversations.messagebird.com/v1/send',
                                 headers: {'Authorization': 'AccessKey ' + accessKey},
                                 data: line
                             })
@@ -580,9 +572,8 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                     var data = {
                                         "id": index,
                                         "phone_number": line.to,
-                                        "conversationId": response.data.id,
-                                        "lastMessageId": response.data.messages.lastMessageId,
-                                        "status": "sent",
+                                        "messageId": response.data.id,
+                                        "status": response.data.status,
                                         "timestamp": new Date()
                                     }
                                     console.log(data)
@@ -592,9 +583,8 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                 console.log(error)
                                 var data = {
                                     "id": index,
-                                    "phone_number": csvData[index][waField],
-                                    "conversationId": "",
-                                    "lastMessageId": "",
+                                    "phone_number": line.to,
+                                    "messageId": "",
                                     "status": "failed",
                                     "timestamp": new Date()
                                 }
@@ -626,19 +616,18 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                         async (line, index) => {
                                             axios({
                                                 method: 'POST',
-                                                url: 'https://conversations.messagebird.com/v1/conversations/start',
+                                                url: 'https://conversations.messagebird.com/v1/send',
                                                 headers: {'Authorization': 'AccessKey ' + accessKey},
                                                 data: line
                                             })
                                             .then(response => {
                                                 if(response.status > 200 && response.status < 300){
-                                                    console.log(line)
+                                                    // console.log(line)
                                                     var data = {
                                                         "id": index,
                                                         "phone_number": line.to,
-                                                        "conversationId": response.data.id,
-                                                        "lastMessageId": response.data.messages.lastMessageId,
-                                                        "status": "sent",
+                                                        "messageId": response.data.id,
+                                                        "status": response.data.status,
                                                         "timestamp": new Date()
                                                     }
                                                     // _result.push(data)
@@ -661,8 +650,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                                 var data = {
                                                     "id": index,
                                                     "phone_number": line.to,
-                                                    "conversationId": "",
-                                                    "lastMessageId": "",
+                                                    "messageId": "",
                                                     "status": "failed",
                                                     "timestamp": new Date()
                                                 }
@@ -691,13 +679,13 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                     }
                 }
 
-                res.status(200).send({
+                return res.status(200).send({
                     message: "Processing data... Please wait!"
                 });
 
             });
             } catch (error) {
-                res.status(500).send({
+                return res.status(500).send({
                     message: "Error",
                     error: error
                 });
@@ -706,39 +694,39 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
 
 app.post("/api/upload-video", upload.single("file"), (req, res) => {
     if(req.body.accessKey === undefined || req.body.accessKey === null) {
-        res.status(401).send({message: "Access key is required"});
+        return res.status(401).send({message: "Access key is required"});
     }
 
     if(req.body.namespaceId === undefined || req.body.namespaceId === null) {
-        res.status(400).send({message: "Namespace ID is required"});
+        return res.status(400).send({message: "Namespace ID is required"});
     }
 
     if(req.body.channelId === undefined || req.body.channelId === null) {
-        res.status(400).send({message: "Channel ID is required"});
+        return res.status(400).send({message: "Channel ID is required"});
     }
 
     if(req.body.templateName === undefined || req.body.templateName === null) {
-        res.status(400).send({message: "Template Name is required"});
+        return res.status(400).send({message: "Template Name is required"});
     }
 
     if(req.body.languageCode === undefined || req.body.languageCode === null) {
-        res.status(400).send({message: "Language Code is required"});
+        return res.status(400).send({message: "Language Code is required"});
     }
 
     if(req.body.totalVariable === undefined || req.body.totalVariable === null) {
-        res.status(400).send({message: "Total Variable is required"});
+        return res.status(400).send({message: "Total Variable is required"});
     }
 
     if(req.body.fieldNames === undefined || req.body.fieldNames === null) {
-        res.status(400).send({message: "Field Names is required"});
+        return res.status(400).send({message: "Field Names is required"});
     }
 
     if(req.body.waFieldName === undefined || req.body.waFieldName === null) {
-        res.status(400).send({message: "WA Field Names is required"});
+        return res.status(400).send({message: "WA Field Names is required"});
     }
 
     if(req.body.videoUrl === undefined || req.body.videoUrl === null) {
-        res.status(400).send({message: "Video URL is required"});
+        return res.status(400).send({message: "Video URL is required"});
     }
 
     let totalVariable = req.body.totalVariable ? req.body.totalVariable : 0;
@@ -756,7 +744,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
 
     try {
         if(req.file == undefined) {
-            res.status(400).send({
+            return res.status(400).send({
                 message: "Please upload a file"
             });
         }
@@ -783,7 +771,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                         async (line, index) => {
                             axios({
                                 method: 'POST',
-                                url: 'https://conversations.messagebird.com/v1/conversations/start',
+                                url: 'https://conversations.messagebird.com/v1/send',
                                 headers: {'Authorization': 'AccessKey ' + accessKey},
                                 data: line
                             })
@@ -792,9 +780,8 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                     var data = {
                                         "id": index,
                                         "phone_number": line.to,
-                                        "conversationId": response.data.id,
-                                        "lastMessageId": response.data.messages.lastMessageId,
-                                        "status": "sent",
+                                        "messageId": response.data.id,
+                                        "status": response.data.status,
                                         "timestamp": new Date()
                                     }
                                     console.log(data)
@@ -804,9 +791,8 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                 console.log(error)
                                 var data = {
                                     "id": index,
-                                    "phone_number": csvData[index][waField],
-                                    "conversationId": "",
-                                    "lastMessageId": "",
+                                    "phone_number": line.to,
+                                    "messageId": "",
                                     "status": "failed",
                                     "timestamp": new Date()
                                 }
@@ -838,7 +824,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                         async (line, index) => {
                                             axios({
                                                 method: 'POST',
-                                                url: 'https://conversations.messagebird.com/v1/conversations/start',
+                                                url: 'https://conversations.messagebird.com/v1/send',
                                                 headers: {'Authorization': 'AccessKey ' + accessKey},
                                                 data: line
                                             })
@@ -848,9 +834,8 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                                     var data = {
                                                         "id": index,
                                                         "phone_number": line.to,
-                                                        "conversationId": response.data.id,
-                                                        "lastMessageId": response.data.messages.lastMessageId,
-                                                        "status": "sent",
+                                                        "messageId": response.data.id,
+                                                        "status": response.data.status,
                                                         "timestamp": new Date()
                                                     }
                                                     // _result.push(data)
@@ -873,8 +858,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                                 var data = {
                                                     "id": index,
                                                     "phone_number": line.to,
-                                                    "conversationId": "",
-                                                    "lastMessageId": "",
+                                                    "messageId": "",
                                                     "status": "failed",
                                                     "timestamp": new Date()
                                                 }
@@ -903,13 +887,13 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                     }
                 }
 
-                res.status(200).send({
+                return res.status(200).send({
                     message: "Processing data... Please wait!"
                 });
 
             });
             } catch (error) {
-                res.status(500).send({
+                return res.status(500).send({
                     message: "Error",
                     error: error
                 });
