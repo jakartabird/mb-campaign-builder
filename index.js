@@ -97,7 +97,7 @@ function transformDataImage(data, totalVar, fieldNames, wafieldNames, channelId,
     var text_variables = new Array();
     var i;
     for (i = 0 ; i < totalVariable ; i++){
-        var fieldName = (_fieldNames[0].fieldName);
+        var fieldName = (_fieldNames[i].fieldName);
         var t1 = {
             "type": "text",
             "text": data[fieldName]
