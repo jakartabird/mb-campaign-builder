@@ -909,6 +909,6 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
             }
 });
 
-let server = app.listen(5001, () => {
+let server = app.listen(5000, () => {
     console.log("Server is running on port 5000");
 })
