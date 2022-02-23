@@ -28,7 +28,7 @@ const csvFilter = function (req, file, cb) {
 
 const upload = multer({ storage: storage, fileFilter: csvFilter });
 
-function transformData(data, totalVar, fieldNames, wafieldNames, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, callback) {
+function transformData(data, totalVar, fieldNames, wafieldNames, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, trackId, callback) {
     let totalVariable = totalVar;
     let waField = wafieldNames;
     let language = String(languageCode);
@@ -62,7 +62,8 @@ function transformData(data, totalVar, fieldNames, wafieldNames, channelId, name
             "type": "hsm",
             "from": channelId,
             "channelId": channelId,
-            "reportUrl": reportUrl
+            "reportUrl": reportUrl,
+            "trackId": trackId
         };
     } else {
         _data = {
@@ -79,14 +80,15 @@ function transformData(data, totalVar, fieldNames, wafieldNames, channelId, name
             "type": "hsm",
             "from": channelId,
             "channelId": channelId,
-            "reportUrl": reportUrl
+            "reportUrl": reportUrl,
+            "trackId": trackId
         };
     }
 
     return _data
 }
 
-function transformDataImage(data, totalVar, fieldNames, wafieldNames, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, imageUrl, callback) {
+function transformDataImage(data, totalVar, fieldNames, wafieldNames, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, imageUrl, trackId, callback) {
     let totalVariable = totalVar;
     let waField = wafieldNames;
     let language = String(languageCode);
@@ -111,6 +113,7 @@ function transformDataImage(data, totalVar, fieldNames, wafieldNames, channelId,
         _data = {
             "from": channelId,
             "reportUrl": reportUrl,
+            "trackId": trackId,
             "to": waNumber,
             "channelId": channelId,
             "type": "hsm",
@@ -146,6 +149,7 @@ function transformDataImage(data, totalVar, fieldNames, wafieldNames, channelId,
         _data = {
             "from": channelId,
             "reportUrl": reportUrl,
+            "trackId": trackId,
             "to": waNumber,
             "channelId": channelId,
             "type": "hsm",
@@ -178,7 +182,7 @@ function transformDataImage(data, totalVar, fieldNames, wafieldNames, channelId,
     return _data;
 }
 
-function transformDataVideo(data, totalVar, fieldNames, wafieldNames, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, videoUrl, callback) {
+function transformDataVideo(data, totalVar, fieldNames, wafieldNames, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, videoUrl, trackId, callback) {
     let totalVariable = totalVar;
     let waField = wafieldNames;
     let language = String(languageCode);
@@ -203,6 +207,7 @@ function transformDataVideo(data, totalVar, fieldNames, wafieldNames, channelId,
         _data = {
             "from": channelId,
             "reportUrl": reportUrl,
+            "trackId": trackId,
             "to": waNumber,
             "channelId": channelId,
             "type": "hsm",
@@ -238,6 +243,7 @@ function transformDataVideo(data, totalVar, fieldNames, wafieldNames, channelId,
         _data = {
             "from": channelId,
             "reportUrl": reportUrl,
+            "trackId": trackId,
             "to": waNumber,
             "channelId": channelId,
             "type": "hsm",
@@ -312,6 +318,7 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
     let languageCode = req.body.languageCode;
     let reportUrl = req.body.reportUrl ? req.body.reportUrl : "";
     let accessKey = req.body.accessKey;
+    let trackId = req.body.trackId ? req.body.trackId : "";
     // let dbType = req.body.dbtype;
     // let connectionString = req.body.connectionString;
 
@@ -330,7 +337,7 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
             .pipe(csv.parse({headers: true, delimiter: ',', trim: true, skipLines: 0, skipEmptyLines: true, trimHeaders: true}))
             .on('data', (row) => {
                 try {
-                    var data = transformData(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey);
+                    var data = transformData(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, trackId);
                     // console.log(data)
                     csvData.push(data);
                   } finally {
@@ -531,6 +538,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
     let reportUrl = req.body.reportUrl ? req.body.reportUrl : "";
     let imageUrl = req.body.imageUrl;
     let accessKey = req.body.accessKey;
+    let trackId = req.body.trackId ? req.body.trackId : "";
 
     let csvData = [];
 
@@ -547,7 +555,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
             .pipe(csv.parse({headers: true, delimiter: ',', trim: true, skipLines: 0, skipEmptyLines: true, trimHeaders: true}))
             .on('data', (row) => {
                 try {
-                    var data = transformDataImage(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, imageUrl);
+                    var data = transformDataImage(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, imageUrl, trackId);
                     console.log(JSON.stringify(data))
                     csvData.push(data);
                   } finally {
@@ -739,6 +747,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
     let reportUrl = req.body.reportUrl ? req.body.reportUrl : "";
     let videoUrl = req.body.videoUrl;
     let accessKey = req.body.accessKey;
+    let trackId = req.body.trackId ? req.body.trackId : "";
 
     let csvData = [];
 
@@ -755,7 +764,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
             .pipe(csv.parse({headers: true, delimiter: ',', trim: true, skipLines: 0, skipEmptyLines: true, trimHeaders: true}))
             .on('data', (row) => {
                 try {
-                    var data = transformDataVideo(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, videoUrl);
+                    var data = transformDataVideo(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, videoUrl, trackId);
                     console.log(JSON.stringify(data))
                     csvData.push(data);
                   } finally {
@@ -900,6 +909,6 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
             }
 });
 
-let server = app.listen(5000, () => {
+let server = app.listen(5001, () => {
     console.log("Server is running on port 5000");
 })
