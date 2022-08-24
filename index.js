@@ -5,7 +5,10 @@ const express = require('express');
 const { default: axios } = require('axios');
 const app = express();
 const { MongoClient } = require('mongodb');
-const Bluebird = require('bluebird');
+const Bottleneck = require('bottleneck');
+
+// Update with your config settings.
+require('dotenv').config({path: '.env'});
 
 global.__basedir = __dirname;
 
@@ -277,6 +280,10 @@ function transformDataVideo(data, totalVar, fieldNames, wafieldNames, channelId,
 }
 
 app.post("/api/upload-text", upload.single("file"), (req, res) => {
+    if(process.env.MIN_TIME === undefined || process.env.MIN_TIME === 0)
+    {
+        return res.status(500).send({message: "Configration fail"});
+    }
     if(req.body.accessKey === undefined || req.body.accessKey === null) {
         return res.status(401).send({message: "Access key is required"});
     }
@@ -322,6 +329,12 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
     // let dbType = req.body.dbtype;
     // let connectionString = req.body.connectionString;
 
+    // Declare limiter for bottlenecking activity
+    const limiter = new Bottleneck({
+        maxConcurrent: 50,
+        minTime: 25
+    });
+
     let csvData = [];
 
     try {
@@ -338,7 +351,6 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
             .on('data', (row) => {
                 try {
                     var data = transformData(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, trackId);
-                    // console.log(data)
                     csvData.push(data);
                   } finally {
                     //   Then
@@ -348,10 +360,8 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
             .on('end', () => {
 
                 if(req.body.connectionString === undefined || req.body.connectionString === null) {
-                    Bluebird.map(
-                        csvData,
-                        async (line, index) => {
-                            console.log(JSON.stringify(line));
+                    csvData.forEach((line, index) => {
+                        limiter.schedule(() => {
                             axios({
                                 method: 'POST',
                                 url: 'https://conversations.messagebird.com/v1/send',
@@ -360,7 +370,7 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                             })
                             .then(response => {
                                 if(response.status > 200 && response.status < 300){
-                                    console.log(line)
+                                    // console.log(line)
                                     var data = {
                                         "id": index,
                                         "phone_number": line.to,
@@ -368,15 +378,11 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                         "status": response.data.status,
                                         "timestamp": new Date()
                                     }
-                                    // _result.push(data)
                                     console.log(data)
-                                    // console.log(_result)
-                
-                                    // // try to mongo
                                 }
                             })
                             .catch(error => {
-                                // console.log(error)
+                                console.log(error.response.status)
                                 var data = {
                                     "id": index,
                                     "phone_number": line.to,
@@ -384,15 +390,11 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                     "status": "failed",
                                     "timestamp": new Date()
                                 }
-
-                                // _result.push(data)
                                 console.log(data)
                             })
-                            return Bluebird.resolve();
-                        },
-                        { concurrency: 1 }
-                    )
-                } else {
+                        })
+                    })
+                }else {
                     if(req.body.databaseName === undefined || req.body.databaseName === null) {
                         // If no database name is provided, ignore the data
                         return res.status(400).send({message: "If you type in the connection string, Database name is required"});
@@ -401,17 +403,15 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                             // If no collection name is provided, ignore the data
                             return res.status(400).send({message: "If you type in the connection string, Collection name is required"});
                         } else {
-                            //open connection to mongoDB and insert Bluebird Map inside of it
                             const client = new MongoClient(req.body.connectionString, { useNewUrlParser: true, useUnifiedTopology: true, keepAlive: true });
+
                             try {
                                 client.connect(err => {
                                     const database = client.db(req.body.databaseName);
                                     const collection = database.collection(req.body.collectionName);
 
-                                    // Run Bluebird Map
-                                     Bluebird.map(
-                                        csvData,
-                                        async (line, index) => {
+                                    csvData.forEach((line, index) => {
+                                        limiter.schedule(() => {
                                             axios({
                                                 method: 'POST',
                                                 url: 'https://conversations.messagebird.com/v1/send',
@@ -420,8 +420,6 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                             })
                                             .then(response => {
                                                 if(response.status > 200 && response.status < 300){
-                                                    console.log(line)
-
                                                     var data = {
                                                         "id": index,
                                                         "phone_number": line.to,
@@ -429,23 +427,18 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                                         "status": response.data.status,
                                                         "timestamp": new Date()
                                                     }
-                                                    // _result.push(data)
-                                                    console.log(data)
-                                                    // console.log(_result)
-                                
-                                                    // // try to mongo
-                                                    
                                                     collection.insertOne(data, ((err, result) => {
                                                         console.log("result : masuk")
                                                         if(err) {
                                                             console.log(err)
                                                         }
-                                                        // client.close();
+                                                        client.close();
                                                     }));
+                                                    console.log(data)
                                                 }
                                             })
                                             .catch(error => {
-                                                // console.log(error)
+                                                console.log(error.response.status)
                                                 var data = {
                                                     "id": index,
                                                     "phone_number": line.to,
@@ -453,42 +446,35 @@ app.post("/api/upload-text", upload.single("file"), (req, res) => {
                                                     "status": "failed",
                                                     "timestamp": new Date()
                                                 }
-
                                                 collection.insertOne(data, ((err, result) => {
-                                                    console.log("result : " + result)
+                                                    console.log("result : masuk")
                                                     if(err) {
                                                         console.log(err)
                                                     }
-                                                    // client.close();
+                                                    client.close();
                                                 }));
-
-                                                // _result.push(data)
-                                                console.log(data)
                                             })
-                                            return Bluebird.resolve();
-                                        },
-                                        { concurrency: 1 }
-                                    )
-                                });
-                            } finally {
-                                client.close()
-                                console.log("finally")
+                                        })
+                                    })
+                                })
+                            } catch (error) {
+                                console.log(error)
                             }
                         }
                     }
                 }
+            }) 
 
-                return res.status(200).send({
-                    message: "Processing data... Please wait!"
-                });
-
+            return res.status(200).send({
+                message: "Processing data... Please wait!"
             });
-            } catch (error) {
-                return res.status(500).send({
-                    message: "Error",
-                    error: error
-                });
-            }
+
+        } catch (error) {
+            return res.status(500).send({
+                message: "Error",
+                error: error
+            });
+        }
 });
 
 app.post("/api/upload-image", upload.single("file"), (req, res) => {
@@ -540,6 +526,11 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
     let accessKey = req.body.accessKey;
     let trackId = req.body.trackId ? req.body.trackId : "";
 
+    const limiter = new Bottleneck({
+        maxConcurrent: 50,
+        minTime: 25
+    });
+
     let csvData = [];
 
     try {
@@ -556,7 +547,6 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
             .on('data', (row) => {
                 try {
                     var data = transformDataImage(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, imageUrl, trackId);
-                    console.log(JSON.stringify(data))
                     csvData.push(data);
                   } finally {
                     //   Then
@@ -566,9 +556,8 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
             .on('end', () => {
 
                 if(req.body.connectionString === undefined || req.body.connectionString === null) {
-                    Bluebird.map(
-                        csvData,
-                        async (line, index) => {
+                    csvData.forEach((line, index) => {
+                        limiter.schedule(() => {
                             axios({
                                 method: 'POST',
                                 url: 'https://conversations.messagebird.com/v1/send',
@@ -577,6 +566,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                             })
                             .then(response => {
                                 if(response.status > 200 && response.status < 300){
+                                    // console.log(line)
                                     var data = {
                                         "id": index,
                                         "phone_number": line.to,
@@ -588,7 +578,7 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                 }
                             })
                             .catch(error => {
-                                console.log(error)
+                                console.log(error.response.status)
                                 var data = {
                                     "id": index,
                                     "phone_number": line.to,
@@ -598,11 +588,9 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                 }
                                 console.log(data)
                             })
-                            return Bluebird.resolve();
-                        },
-                        { concurrency: 1 }
-                    )
-                } else {
+                        })
+                    })
+                }else {
                     if(req.body.databaseName === undefined || req.body.databaseName === null) {
                         // If no database name is provided, ignore the data
                         return res.status(400).send({message: "If you type in the connection string, Database name is required"});
@@ -611,17 +599,15 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                             // If no collection name is provided, ignore the data
                             return res.status(400).send({message: "If you type in the connection string, Collection name is required"});
                         } else {
-                            //open connection to mongoDB and insert Bluebird Map inside of it
                             const client = new MongoClient(req.body.connectionString, { useNewUrlParser: true, useUnifiedTopology: true, keepAlive: true });
+
                             try {
                                 client.connect(err => {
                                     const database = client.db(req.body.databaseName);
                                     const collection = database.collection(req.body.collectionName);
 
-                                    // Run Bluebird Map
-                                     Bluebird.map(
-                                        csvData,
-                                        async (line, index) => {
+                                    csvData.forEach((line, index) => {
+                                        limiter.schedule(() => {
                                             axios({
                                                 method: 'POST',
                                                 url: 'https://conversations.messagebird.com/v1/send',
@@ -630,7 +616,6 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                             })
                                             .then(response => {
                                                 if(response.status > 200 && response.status < 300){
-                                                    // console.log(line)
                                                     var data = {
                                                         "id": index,
                                                         "phone_number": line.to,
@@ -638,23 +623,18 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                                         "status": response.data.status,
                                                         "timestamp": new Date()
                                                     }
-                                                    // _result.push(data)
-                                                    console.log(data)
-                                                    // console.log(_result)
-                                
-                                                    // // try to mongo
-                                                    
                                                     collection.insertOne(data, ((err, result) => {
                                                         console.log("result : masuk")
                                                         if(err) {
                                                             console.log(err)
                                                         }
-                                                        // client.close();
+                                                        client.close();
                                                     }));
+                                                    console.log(data)
                                                 }
                                             })
                                             .catch(error => {
-                                                // console.log(error)
+                                                console.log(error.response.status)
                                                 var data = {
                                                     "id": index,
                                                     "phone_number": line.to,
@@ -662,26 +642,19 @@ app.post("/api/upload-image", upload.single("file"), (req, res) => {
                                                     "status": "failed",
                                                     "timestamp": new Date()
                                                 }
-
                                                 collection.insertOne(data, ((err, result) => {
-                                                    console.log("result : " + result)
+                                                    console.log("result : masuk")
                                                     if(err) {
                                                         console.log(err)
                                                     }
-                                                    // client.close();
+                                                    client.close();
                                                 }));
-
-                                                // _result.push(data)
-                                                console.log(data)
                                             })
-                                            return Bluebird.resolve();
-                                        },
-                                        { concurrency: 1 }
-                                    )
-                                });
-                            } finally {
-                                client.close()
-                                console.log("finally")
+                                        })
+                                    })
+                                })
+                            } catch (error) {
+                                console.log(error)
                             }
                         }
                     }
@@ -749,6 +722,11 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
     let accessKey = req.body.accessKey;
     let trackId = req.body.trackId ? req.body.trackId : "";
 
+    const limiter = new Bottleneck({
+        maxConcurrent: 50,
+        minTime: 25
+    });
+
     let csvData = [];
 
     try {
@@ -765,7 +743,6 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
             .on('data', (row) => {
                 try {
                     var data = transformDataVideo(row, totalVariable, fieldNames, waField, channelId, namespaceId, templateName, languageCode, reportUrl, accessKey, videoUrl, trackId);
-                    console.log(JSON.stringify(data))
                     csvData.push(data);
                   } finally {
                     //   Then
@@ -775,9 +752,8 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
             .on('end', () => {
 
                 if(req.body.connectionString === undefined || req.body.connectionString === null) {
-                    Bluebird.map(
-                        csvData,
-                        async (line, index) => {
+                    csvData.forEach((line, index) => {
+                        limiter.schedule(() => {
                             axios({
                                 method: 'POST',
                                 url: 'https://conversations.messagebird.com/v1/send',
@@ -786,6 +762,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                             })
                             .then(response => {
                                 if(response.status > 200 && response.status < 300){
+                                    // console.log(line)
                                     var data = {
                                         "id": index,
                                         "phone_number": line.to,
@@ -797,7 +774,7 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                 }
                             })
                             .catch(error => {
-                                console.log(error)
+                                console.log(error.response.status)
                                 var data = {
                                     "id": index,
                                     "phone_number": line.to,
@@ -807,11 +784,9 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                 }
                                 console.log(data)
                             })
-                            return Bluebird.resolve();
-                        },
-                        { concurrency: 1 }
-                    )
-                } else {
+                        })
+                    })
+                }else {
                     if(req.body.databaseName === undefined || req.body.databaseName === null) {
                         // If no database name is provided, ignore the data
                         return res.status(400).send({message: "If you type in the connection string, Database name is required"});
@@ -820,17 +795,15 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                             // If no collection name is provided, ignore the data
                             return res.status(400).send({message: "If you type in the connection string, Collection name is required"});
                         } else {
-                            //open connection to mongoDB and insert Bluebird Map inside of it
                             const client = new MongoClient(req.body.connectionString, { useNewUrlParser: true, useUnifiedTopology: true, keepAlive: true });
+
                             try {
                                 client.connect(err => {
                                     const database = client.db(req.body.databaseName);
                                     const collection = database.collection(req.body.collectionName);
 
-                                    // Run Bluebird Map
-                                     Bluebird.map(
-                                        csvData,
-                                        async (line, index) => {
+                                    csvData.forEach((line, index) => {
+                                        limiter.schedule(() => {
                                             axios({
                                                 method: 'POST',
                                                 url: 'https://conversations.messagebird.com/v1/send',
@@ -839,7 +812,6 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                             })
                                             .then(response => {
                                                 if(response.status > 200 && response.status < 300){
-                                                    console.log(line)
                                                     var data = {
                                                         "id": index,
                                                         "phone_number": line.to,
@@ -847,23 +819,18 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                                         "status": response.data.status,
                                                         "timestamp": new Date()
                                                     }
-                                                    // _result.push(data)
-                                                    console.log(data)
-                                                    // console.log(_result)
-                                
-                                                    // // try to mongo
-                                                    
                                                     collection.insertOne(data, ((err, result) => {
                                                         console.log("result : masuk")
                                                         if(err) {
                                                             console.log(err)
                                                         }
-                                                        // client.close();
+                                                        client.close();
                                                     }));
+                                                    console.log(data)
                                                 }
                                             })
                                             .catch(error => {
-                                                // console.log(error)
+                                                console.log(error.response.status)
                                                 var data = {
                                                     "id": index,
                                                     "phone_number": line.to,
@@ -871,26 +838,19 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
                                                     "status": "failed",
                                                     "timestamp": new Date()
                                                 }
-
                                                 collection.insertOne(data, ((err, result) => {
-                                                    console.log("result : " + result)
+                                                    console.log("result : masuk")
                                                     if(err) {
                                                         console.log(err)
                                                     }
-                                                    // client.close();
+                                                    client.close();
                                                 }));
-
-                                                // _result.push(data)
-                                                console.log(data)
                                             })
-                                            return Bluebird.resolve();
-                                        },
-                                        { concurrency: 1 }
-                                    )
-                                });
-                            } finally {
-                                client.close()
-                                console.log("finally")
+                                        })
+                                    })
+                                })
+                            } catch (error) {
+                                console.log(error)
                             }
                         }
                     }
@@ -909,6 +869,6 @@ app.post("/api/upload-video", upload.single("file"), (req, res) => {
             }
 });
 
-let server = app.listen(5000, () => {
-    console.log("Server is running on port 5000");
+let server = app.listen(3000, () => {
+    console.log("Server is running on port 3000");
 })

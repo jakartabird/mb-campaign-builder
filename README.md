@@ -5,7 +5,7 @@ HSM API is a Campaign Builder for WhatsApp. We are using MessageBird API to star
 
 In here, you will get 3 endpoints. 1 for text, 1 for image, and the other one for video template broadcast.
 
-Postman Links [here](https://www.getpostman.com/collections/3cb889f54ec3e44d1424)
+Postman Links [here](https://www.getpostman.com/collections/092c072ebe3c202b3d0a)
 
 ___
 
